@@ -10,11 +10,33 @@ from scipy.interpolate import griddata
 from glob import glob
 import tensorflow as tf
 
-dataset_internet_interpolated = np.load('ID10002.npy')
+# Part 1 - Data preprocessing
+
+ID = 10002
+# get all text files with names starting with sms-call-internet-tn
+filenames = glob('sms-call-internet-tn*.txt')
+# get data of different days for grid with id numebr = ID, 
+for (i,f) in enumerate(filenames):
+    data_temp = pd.read_csv(f,sep='\t').values
+    data_temp = data_temp[data_temp[:,0] == ID]
+    if i == 0:
+        dataset_raw =  data_temp
+    else:
+        dataset_raw = np.concatenate((dataset_raw,data_temp), axis=0)      
+ 
+    
+dataset_internet = dataset_raw[dataset_raw[:,2]==39] # get the data for country code=39
+dataset_internet = dataset_internet[:,[1,-1]] # get only the grid ID and internet connection request
+dataset_internet[:,0] = (dataset_internet[:,0] /600000)-min(dataset_internet[:,0] /600000)
+
+# interpolate to derive the internet value for missed time slots if any exists 
+f_interpolation = interp1d(dataset_internet[:,0], dataset_internet[:,1],kind='slinear' ,fill_value="extrapolate")
+dataset_internet_interpolated = f_interpolation(np.arange(0,8640)) # output is sorted internet connection requests based on time stamps
+dataset_internet_interpolated = dataset_internet_interpolated.reshape(-1,1)
+
 
 #Normalizing data
 from sklearn.preprocessing import MinMaxScaler
-
 scaler = MinMaxScaler(feature_range=(0, 1))
 train_data_normalize = scaler.fit_transform(dataset_internet_interpolated)
 
